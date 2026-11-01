@@ -20,6 +20,10 @@ CONF_PHASE_L2 = "phase_l2_entity"
 CONF_PHASE_L3 = "phase_l3_entity"
 CONF_PHASE_UNIT = "phase_unit"
 
+# APstorage battery (optional)
+CONF_APSTORAGE_DEVICE = "apstorage_device"
+CONF_SYNC_RESERVE = "sync_reserve_soc"
+
 # Electrical
 CONF_VOLTAGE = "voltage"
 CONF_FUSE_CURRENT = "fuse_current"

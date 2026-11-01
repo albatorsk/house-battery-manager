@@ -7,6 +7,18 @@
           "name": "Name"
         }
       },
+      "battery": {
+        "title": "APstorage battery",
+        "description": "Optional. Choose the APstorage battery to control. Its entities are then filled in for you, setpoints are written straight to it and battery alarms stop the battery (0 W) until they clear.",
+        "data": {
+          "apstorage_device": "APstorage battery",
+          "sync_reserve_soc": "Also set the battery's own minimum SoC reserve"
+        },
+        "data_description": {
+          "apstorage_device": "Leave empty to use any battery through its entities.",
+          "sync_reserve_soc": "Writes the Reserve SoC entity to the battery (SoC Reserve Min). The battery then refuses to discharge below it, also in Force discharge."
+        }
+      },
       "entities": {
         "title": "Entities",
         "description": "Battery setpoint convention: positive W = discharge/export, negative W = charge/import.",
@@ -65,6 +77,18 @@
   },
   "options": {
     "step": {
+      "battery": {
+        "title": "APstorage battery",
+        "description": "Optional. Choose the APstorage battery to control. Its entities are then filled in for you, setpoints are written straight to it and battery alarms stop the battery (0 W) until they clear.",
+        "data": {
+          "apstorage_device": "APstorage battery",
+          "sync_reserve_soc": "Also set the battery's own minimum SoC reserve"
+        },
+        "data_description": {
+          "apstorage_device": "Leave empty to use any battery through its entities.",
+          "sync_reserve_soc": "Writes the Reserve SoC entity to the battery (SoC Reserve Min). The battery then refuses to discharge below it, also in Force discharge."
+        }
+      },
       "entities": {
         "title": "Entities",
         "description": "Battery setpoint convention: positive W = discharge/export, negative W = charge/import.",

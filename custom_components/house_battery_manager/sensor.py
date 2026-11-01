@@ -95,12 +95,16 @@ class HouseBatterySensor(HouseBatteryEntity, SensorEntity):
         decision = self._manager.decision
         if self.entity_description.key != "status" or decision is None:
             return None
-        return {
+        attributes: dict[str, Any] = {
             "fuse_limited": decision.fuse_limited,
             "fuse_min_setpoint": _round(decision.fuse_min_setpoint),
             "fuse_max_setpoint": _round(decision.fuse_max_setpoint),
             "battery_power_used": _round(decision.details.get("battery_now")),
         }
+        if (apstorage := self._manager.apstorage) is not None:
+            attributes["battery_charge_status"] = apstorage.charge_status()
+            attributes["battery_alarms"] = apstorage.alarms()
+        return attributes
 
 
 def _round(value: float | None) -> float | None:

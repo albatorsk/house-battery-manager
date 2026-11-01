@@ -1,6 +1,9 @@
 {
   "domain": "house_battery_manager",
   "name": "House Battery Manager",
+  "after_dependencies": [
+    "apstorage"
+  ],
   "codeowners": [
     "@albatorsk"
   ],

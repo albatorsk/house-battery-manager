@@ -46,6 +46,10 @@ class Measurements:
     ev_power: float | None = None
     """EV charger power, always >= 0. None if not available."""
 
+    battery_fault: str | None = None
+    """Why the battery cannot be trusted to follow commands (alarm, stopped
+    controller), or None when it is healthy or this is unknown."""
+
 
 @dataclass(slots=True)
 class Settings:
@@ -134,6 +138,11 @@ def compute(
     mode = settings.mode
     if mode is Mode.OFF:
         return Decision(None, "Off: not controlling the battery")
+
+    if meas.battery_fault:
+        # Regulating a faulty battery could make things worse; act as Idle
+        # until the fault clears. The selected mode is kept.
+        return Decision(0.0, f"Battery fault ({meas.battery_fault}): battery set to 0 W")
 
     if meas.grid_power is None:
         # Without grid data we cannot regulate nor guarantee the fuse limit.

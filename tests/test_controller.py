@@ -201,5 +201,23 @@ class FuseProtectionTest(unittest.TestCase):
             self.assertLessEqual(max(abs(c) for c in new_currents), LIMIT_A + 0.01)
 
 
+
+class BatteryFaultTest(unittest.TestCase):
+    def test_fault_sets_zero_in_every_controlling_mode(self) -> None:
+        for mode in (Mode.AUTO, Mode.FORCE_CHARGE, Mode.FORCE_DISCHARGE, Mode.IDLE):
+            s = Settings(mode=mode)
+            d = compute(
+                Measurements(grid_power=3000, battery_fault="over temperature"), s, 2000
+            )
+            self.assertEqual(d.setpoint, 0.0)
+            self.assertIn("over temperature", d.status)
+            self.assertFalse(d.force_finished)
+
+    def test_off_mode_still_sends_nothing(self) -> None:
+        s = Settings(mode=Mode.OFF)
+        d = compute(Measurements(grid_power=3000, battery_fault="ground fault"), s, 0)
+        self.assertIsNone(d.setpoint)
+
+
 if __name__ == "__main__":
     unittest.main()

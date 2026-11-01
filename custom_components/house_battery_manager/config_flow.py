@@ -11,8 +11,10 @@ from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
-from .apstorage import suggested_config
+from .apstorage import APSTORAGE_DOMAIN, apstorage_device_ids, suggested_config
 from .const import (
+    CONF_APSTORAGE_DEVICE,
+    CONF_SYNC_RESERVE,
     CONF_BATTERY_POWER,
     CONF_BATTERY_POWER_INVERT,
     CONF_BATTERY_SETPOINT,
@@ -79,6 +81,15 @@ def _choice(options: list[str], key: str) -> selector.SelectSelector:
     )
 
 
+BATTERY_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_APSTORAGE_DEVICE): selector.DeviceSelector(
+            selector.DeviceSelectorConfig(integration=APSTORAGE_DOMAIN)
+        ),
+        vol.Required(CONF_SYNC_RESERVE, default=False): BOOL,
+    }
+)
+
 ENTITIES_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_BATTERY_SETPOINT): selector.EntitySelector(
@@ -141,6 +152,27 @@ class _FlowSteps:
     def _defaults(self) -> dict[str, Any]:
         return self.data
 
+    def _apstorage_suggestions(self) -> dict[str, Any]:
+        """Entities and limits of the APstorage battery chosen in this flow."""
+        device_id = self.data.get(CONF_APSTORAGE_DEVICE)
+        return suggested_config(self.hass, device_id) if device_id else {}
+
+    async def async_step_battery(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Choose an APstorage battery, if any is set up."""
+        if user_input is not None:
+            self.data.update(user_input)
+            return await self.async_step_entities()
+        devices = apstorage_device_ids(self.hass)
+        if not devices:
+            return await self.async_step_entities()
+        defaults = self._defaults()
+        if CONF_APSTORAGE_DEVICE not in defaults and len(devices) == 1:
+            defaults = {**defaults, CONF_APSTORAGE_DEVICE: devices[0]}
+        return self.async_show_form(
+            step_id="battery",
+            data_schema=self.add_suggested_values_to_schema(BATTERY_SCHEMA, defaults),
+        )
+
     async def async_step_entities(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             self.data.update(user_input)
@@ -188,7 +220,7 @@ class HouseBatteryConfigFlow(_FlowSteps, ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             self.data[CONF_NAME] = user_input[CONF_NAME]
-            return await self.async_step_entities()
+            return await self.async_step_battery()
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
@@ -197,8 +229,8 @@ class HouseBatteryConfigFlow(_FlowSteps, ConfigFlow, domain=DOMAIN):
         )
 
     def _defaults(self) -> dict[str, Any]:
-        # Pre-fill the entities and limits of an APstorage battery, if present.
-        return {**suggested_config(self.hass), **self.data}
+        # Pre-fill the entities and limits of the chosen APstorage battery.
+        return {**self._apstorage_suggestions(), **self.data}
 
     def _finish(self) -> ConfigFlowResult:
         return self.async_create_entry(title=self.data[CONF_NAME], data=self.data)
@@ -218,12 +250,17 @@ class HouseBatteryOptionsFlow(_FlowSteps, OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         self.data = {CONF_NAME: self.config_entry.title}
         self._previous = dict(self.config_entry.options or self.config_entry.data)
-        return await self.async_step_entities()
+        return await self.async_step_battery()
 
     def _defaults(self) -> dict[str, Any]:
         # Previous values are only suggestions; the stored options are built
         # solely from what is submitted, so cleared optional entities vanish.
-        return {**self._previous, **self.data}
+        suggestions: dict[str, Any] = {}
+        device_id = self.data.get(CONF_APSTORAGE_DEVICE)
+        if device_id and device_id != self._previous.get(CONF_APSTORAGE_DEVICE):
+            # A different battery was chosen: suggest its entities instead.
+            suggestions = self._apstorage_suggestions()
+        return {**self._previous, **suggestions, **self.data}
 
     def _finish(self) -> ConfigFlowResult:
         return self.async_create_entry(data=self.data)

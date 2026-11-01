@@ -67,8 +67,9 @@ This integration works with the
 (ELT-12, and probably ELS-11.4).
 
 1. Install and set up the APstorage integration first.
-2. Add House Battery Manager. If exactly one APstorage battery is set up, the
-   setup form is pre-filled with its entities:
+2. Add House Battery Manager. The *APstorage battery* step lists your APstorage
+   batteries; the only one is pre-selected. With a battery chosen, the next form
+   is pre-filled with its entities:
 
    | Field | APstorage entity |
    |---|---|
@@ -81,20 +82,41 @@ This integration works with the
    the same convention as this integration: positive W = discharge.
 4. Add your own energy meter and, preferably, per-phase sensors.
 
+With an APstorage battery chosen:
+
+* **Direct writes.** Setpoints go straight to the APstorage Modbus client, which
+  waits for the write. A failed write is not counted as sent, so fuse
+  protection never assumes the battery got a value it did not get. This needs
+  an APstorage version with the coordinator API; older versions are used
+  through the *Set Power* entity, as before.
+* **Alarms.** A battery alarm (over/under temperature, voltage or current,
+  ground fault, communication error) or a stopped controller heartbeat makes
+  the controller act as `Idle` (0 W) until it clears. The selected mode is kept,
+  so regulation resumes by itself. `sensor.<name>_status` shows the reason and
+  has `battery_charge_status` and `battery_alarms` attributes. PCS grid voltage
+  warnings are listed but do not stop the battery: the PCS handles those itself.
+* **Reserve SoC on the battery (optional).** With *Also set the battery's own
+  minimum SoC reserve* on, the Reserve SoC entity is also written to the
+  battery's *SoC Reserve Min* register. The battery then refuses to discharge
+  below it by itself, also in Force discharge, so a Force discharge target
+  below the reserve is not reached. Off by default.
+
 Things to know:
 
-* APstorage polls the battery every 60 s by default, so its battery power and
-  SoC can be up to a minute old. A battery power reading taken before the last
-  command is ignored, and the setpoint just sent is used instead. Polling more
-  often adds load to the same Modbus server that receives the commands.
-* Do not use APstorage's *Grid Power Phase A/B/C* as the meter or the phase
-  sensors. They are polled far too slowly for fuse protection. Use the house
-  meter.
-* APstorage sends a setpoint 0.4 s after it is set and pauses polling for
-  1.5 s after a write. Both fit within the 3 s command interval.
-* APstorage only logs failed writes. The service call still succeeds, so this
-  integration cannot tell. Check the APstorage log if the battery does not
-  follow `sensor.<name>_battery_setpoint`.
+* Recent APstorage versions read SoC, battery power, charge status, alarms and
+  the controller heartbeat every 5 s (*Fast scan interval*), in one Modbus
+  request. Older versions poll everything every 60 s. A battery power reading
+  taken before the last command is ignored, and the setpoint just sent is used
+  instead.
+* Use the house meter for the meter and the phase sensors. APstorage's *Grid
+  Power Phase A/B/C* update every 5 s at best, which is too slow for fuse
+  protection.
+* APstorage pauses reading for 1.5 s after a write. That fits within the 3 s
+  command interval.
+* Setpoints written through the entity of an older APstorage version are sent
+  0.4 s later and failures are only logged, so this integration cannot tell.
+  Check the APstorage log if the battery does not follow
+  `sensor.<name>_battery_setpoint`.
 * With Modbus enabled, the battery waits in standby (HOLDING) until it gets a
   command. In `Off` mode this integration sends nothing, so the battery keeps
   the last setpoint it got. Use `Idle` to make the battery stop.
@@ -110,7 +132,7 @@ Things to know:
 | `number.<name>_reserve_soc` | Auto mode never discharges below this SoC. |
 | `number.<name>_force_charge_target_soc` / `_force_discharge_target_soc` | Forced mode ends at this SoC. |
 | `switch.<name>_battery_may_power_ev` | Only if an EV charger sensor is configured. When off, Auto lets the EV charge from the grid rather than draining the battery. |
-| `sensor.<name>_status`, `_battery_setpoint`, `_grid_power`, `_fuse_headroom`, `_force_ends` | What the controller is doing. `_battery_setpoint` is the last value actually sent. |
+| `sensor.<name>_status`, `_battery_setpoint`, `_grid_power`, `_fuse_headroom`, `_force_ends` | What the controller is doing. `_battery_setpoint` is the last value sent without an error. |
 | `binary_sensor.<name>_fuse_overload` | On while any phase is above fuse − margin (19 A by default). See *EV charger without load balancing*. |
 
 ## Services
@@ -181,8 +203,11 @@ up. That is safe for the fuse, and normal regulation corrects it afterwards. Sma
 sent at all, except for a keep-alive once a minute.
 
 **Fail-safe:** if the meter (or any configured phase sensor) is unavailable or
-stale, the battery is set to 0 W. When the integration is unloaded or
-reconfigured it also sets the battery to 0 W (unless the mode is `Off`).
+stale, the battery is set to 0 W. The same happens while an APstorage battery
+reports an alarm. If the battery setpoint entity is unavailable, nothing is
+sent (Home Assistant would silently drop it) and a warning is logged. When the
+integration is unloaded or reconfigured it also sets the battery to 0 W (unless
+the mode is `Off`).
 A forced mode is restored after a Home Assistant restart only if it had an end
 time that has not yet passed.
 

@@ -19,7 +19,9 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 
+from .apstorage import APstorageLink
 from .const import (
+    CONF_APSTORAGE_DEVICE,
     CONF_BATTERY_POWER,
     CONF_BATTERY_POWER_INVERT,
     CONF_BATTERY_SETPOINT,
@@ -43,6 +45,7 @@ from .const import (
     CONF_PV,
     CONF_SOC,
     CONF_STALE_TIMEOUT,
+    CONF_SYNC_RESERVE,
     CONF_UPDATE_INTERVAL,
     CONF_VOLTAGE,
     DEFAULT_COMMAND_INTERVAL,
@@ -113,6 +116,14 @@ class BatteryManager:
         self.grid_power: float | None = None
         self.decision: Decision | None = None
 
+        # Optional APstorage battery: direct writes, alarms and heartbeat.
+        device_id = cfg.get(CONF_APSTORAGE_DEVICE)
+        self.apstorage: APstorageLink | None = (
+            APstorageLink(hass, device_id) if device_id else None
+        )
+        # Reserve SoC waiting to be written to the battery itself.
+        self._reserve_pending: float | None = None
+
         self._listeners: list[CALLBACK_TYPE] = []
         self._unsubs: list[CALLBACK_TYPE] = []
         self._force_timer: CALLBACK_TYPE | None = None
@@ -148,6 +159,8 @@ class BatteryManager:
         self._unsubs.append(
             async_track_state_change_event(self.hass, fast_entities, self._async_state_changed)
         )
+        if self.config.get(CONF_SYNC_RESERVE) and self.apstorage:
+            self._reserve_pending = self.settings.min_soc
         await self.async_run()
 
     async def async_stop(self) -> None:
@@ -189,6 +202,8 @@ class BatteryManager:
             self.force_duration = float(value)
         else:
             setattr(self.settings, name, value)
+        if name == "min_soc" and self.config.get(CONF_SYNC_RESERVE) and self.apstorage:
+            self._reserve_pending = float(value)
         self._notify()
         await self.async_run()
 
@@ -286,8 +301,11 @@ class BatteryManager:
         decision = compute(meas, self.settings, self.last_setpoint)
         self.decision = decision
 
+        sent = False
         if decision.setpoint is not None:
-            await self._async_write(decision.setpoint, urgent=decision.emergency)
+            sent = await self._async_write(decision.setpoint, urgent=decision.emergency)
+        if not sent and self._reserve_pending is not None:
+            await self._async_sync_reserve()
 
         if decision.force_finished:
             _LOGGER.info("%s, returning to %s", decision.status, self.mode_before_force)
@@ -297,7 +315,11 @@ class BatteryManager:
 
     async def _async_write(
         self, value: float, force: bool = False, urgent: bool = False
-    ) -> None:
+    ) -> bool:
+        """Send a setpoint to the battery.
+
+        Returns True if a command went to the battery, even one that failed.
+        """
         entity_id = self.config[CONF_BATTERY_SETPOINT]
         state = self.hass.states.get(entity_id)
         if state is not None:
@@ -320,7 +342,7 @@ class BatteryManager:
             and not (value == 0 and self.last_written != 0)
             and now - self.last_write_time < KEEPALIVE_SECONDS
         ):
-            return
+            return False
 
         spacing = self._command_interval
         if urgent:
@@ -331,30 +353,60 @@ class BatteryManager:
                 # Too soon for the Modbus server. Re-run the controller once it
                 # is allowed, so the value sent is based on fresh measurements.
                 self._schedule_run(wait)
-                return
+                return False
             await asyncio.sleep(wait)
 
         if urgent and now - self.last_write_time < self._command_interval:
             _LOGGER.warning(
                 "Fuse overloaded: sending %s W before the normal command interval", value
             )
+        direct = self.apstorage is not None and self.apstorage.writes_directly(entity_id)
+        if not direct and (state is None or state.state == STATE_UNAVAILABLE):
+            # Home Assistant silently skips unavailable entities in service
+            # calls, so the battery would never get this value.
+            _LOGGER.warning("Cannot write %s W: %s is unavailable", value, entity_id)
+            self.last_write_time = monotonic()
+            return False
         # Count failed attempts too, so a struggling server is not hammered.
         self.last_write_time = monotonic()
-        domain = entity_id.split(".", 1)[0]
         try:
-            await self.hass.services.async_call(
-                domain,
-                "set_value",
-                {"entity_id": entity_id, "value": value},
-                blocking=True,
-            )
+            if direct:
+                assert self.apstorage is not None
+                if not await self.apstorage.async_write_power(value):
+                    return False  # replaced by a newer value from elsewhere
+            else:
+                await self.hass.services.async_call(
+                    entity_id.split(".", 1)[0],
+                    "set_value",
+                    {"entity_id": entity_id, "value": value},
+                    blocking=True,
+                )
         except Exception as err:  # noqa: BLE001 - keep the loop alive on any failure
             _LOGGER.warning("Failed to write %s W to %s: %s", value, entity_id, err)
-            return
+            return True
         self.last_written = value
         self.last_write_at = dt_util.utcnow()
         # Only what was actually sent counts as the battery's commanded power.
         self.last_setpoint = value
+        return True
+
+    async def _async_sync_reserve(self) -> None:
+        """Write the reserve SoC to the APstorage battery, spaced like commands."""
+        wait = self._command_interval - (monotonic() - self.last_write_time)
+        if wait > 0:
+            self._schedule_run(wait)
+            return
+        soc = self._reserve_pending
+        self._reserve_pending = None
+        if soc is None or self.apstorage is None:
+            return
+        self.last_write_time = monotonic()
+        try:
+            await self.apstorage.async_write_reserve(soc)
+        except Exception as err:  # noqa: BLE001 - not worth stopping the loop
+            _LOGGER.warning("Failed to set the battery's SoC reserve to %s %%: %s", soc, err)
+        else:
+            _LOGGER.debug("Battery SoC reserve set to %s %%", soc)
 
     # ------------------------------------------------------------------
     # Sensor reading
@@ -479,4 +531,5 @@ class BatteryManager:
             phase_currents=phase_currents,
             soc=soc,
             ev_power=ev_power,
+            battery_fault=self.apstorage.fault() if self.apstorage else None,
         )
