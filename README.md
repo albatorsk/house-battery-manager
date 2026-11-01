@@ -7,15 +7,27 @@ every phase below the main fuse rating.
 
 ## Installation
 
-**HACS:** HACS → ⋮ → *Custom repositories* → add
-`https://github.com/albatorsk/house-battery-manager` as an *Integration*, then
-install *House Battery Manager*.
+**With HACS**
 
-**Manual:** copy `custom_components/house_battery_manager` into your Home
-Assistant `config/custom_components/` folder.
+1. Open HACS in Home Assistant.
+2. Open the menu (⋮) in the top right corner and select *Custom repositories*.
+3. Add `https://github.com/albatorsk/house-battery-manager` with the type
+   *Integration*.
+4. Search for *House Battery Manager* in HACS and install it.
+5. Restart Home Assistant.
 
-Restart Home Assistant, then go to **Settings → Devices & services
-→ Add integration → House Battery Manager**.
+**Manually**
+
+1. Copy the `custom_components/house_battery_manager` folder into your Home
+   Assistant `config/custom_components/` folder.
+2. Restart Home Assistant.
+
+**Add the integration**
+
+1. Go to *Settings* and open *Devices & services*.
+2. Select *Add integration*.
+3. Search for *House Battery Manager* and select it.
+4. Follow the setup steps described below.
 
 ## Setup
 
