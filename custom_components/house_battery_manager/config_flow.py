@@ -11,6 +11,7 @@ from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
+from .apstorage import suggested_config
 from .const import (
     CONF_BATTERY_POWER,
     CONF_BATTERY_POWER_INVERT,
@@ -194,6 +195,10 @@ class HouseBatteryConfigFlow(_FlowSteps, ConfigFlow, domain=DOMAIN):
                 {vol.Required(CONF_NAME, default="House Battery"): selector.TextSelector()}
             ),
         )
+
+    def _defaults(self) -> dict[str, Any]:
+        # Pre-fill the entities and limits of an APstorage battery, if present.
+        return {**suggested_config(self.hass), **self.data}
 
     def _finish(self) -> ConfigFlowResult:
         return self.async_create_entry(title=self.data[CONF_NAME], data=self.data)

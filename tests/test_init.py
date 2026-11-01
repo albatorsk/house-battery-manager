@@ -12,6 +12,7 @@ import pytest
 
 from homeassistant.const import EVENT_CALL_SERVICE
 from homeassistant.core import Event, HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -234,3 +235,87 @@ async def test_config_flow(hass: HomeAssistant) -> None:
     assert result["type"] == "create_entry"
     assert result["data"]["fuse_current"] == 20.0
     assert result["data"]["min_command_interval"] == 3
+
+
+async def test_battery_power_read_before_last_write_is_ignored(
+    hass: HomeAssistant, clock
+) -> None:
+    # A slowly polled battery power sensor (APstorage polls every 60 s).
+    hass.states.async_set("sensor.battery_power", "0", {"unit_of_measurement": "W"})
+    await _setup(hass, battery_power_entity="sensor.battery_power")
+    assert _setpoint(hass) == 1200
+
+    # The meter has not caught up yet; the battery sensor still says 0 W.
+    hass.states.async_set(METER, "1300", {"unit_of_measurement": "W"})
+    await _advance(hass, clock, 3)
+    # Based on the 1200 W just sent, not on the outdated 0 W reading.
+    assert _setpoint(hass) == 2500
+
+    # A fresh battery reading, a second after the write, is used again.
+    await _advance(hass, clock, 1)
+    hass.states.async_set("sensor.battery_power", "2000", {"unit_of_measurement": "W"})
+    hass.states.async_set(METER, "100", {"unit_of_measurement": "W"})
+    await _advance(hass, clock, 2)
+    assert _setpoint(hass) == 2100
+
+
+async def test_setpoint_rounded_to_entity_step(hass: HomeAssistant, clock) -> None:
+    hass.states.async_set(METER, "1234.4", {"unit_of_measurement": "W"})
+    assert await async_setup_component(
+        hass,
+        "input_number",
+        {"input_number": {"battery_setpoint": {"min": -10000, "max": 10000, "step": 10}}},
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_BATTERY_SETPOINT: SETPOINT, CONF_METER: METER, "gain": 1.0},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _setpoint(hass) == 1230
+
+
+async def test_config_flow_suggests_apstorage_entities(hass: HomeAssistant) -> None:
+    apstorage = MockConfigEntry(domain="apstorage", entry_id="aps1")
+    apstorage.add_to_hass(hass)
+    registry = er.async_get(hass)
+    for domain, address, object_id in (
+        ("number", 40183, "aps_123_set_power"),
+        ("sensor", 40117, "aps_123_battery_power"),
+        ("sensor", 40081, "aps_123_state_of_charge_soc"),
+        ("sensor", 40074, "aps_123_max_charge_rate"),
+    ):
+        registry.async_get_or_create(
+            domain,
+            "apstorage",
+            f"apstorage_aps1_{address}",
+            suggested_object_id=object_id,
+            config_entry=apstorage,
+        )
+    hass.states.async_set("sensor.aps_123_max_charge_rate", "6000")
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"name": "Battery"}
+    )
+    suggested = {
+        str(key): key.description["suggested_value"]
+        for key in result["data_schema"].schema
+        if key.description and "suggested_value" in key.description
+    }
+    assert suggested[CONF_BATTERY_SETPOINT] == "number.aps_123_set_power"
+    assert suggested["battery_power_entity"] == "sensor.aps_123_battery_power"
+    assert suggested["soc_entity"] == "sensor.aps_123_state_of_charge_soc"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BATTERY_SETPOINT: "number.aps_123_set_power", CONF_METER: METER},
+    )
+    limits = {
+        str(key): key.description["suggested_value"]
+        for key in result["data_schema"].schema
+        if key.description and "suggested_value" in key.description
+    }
+    assert limits["max_charge_power"] == 6000
+    assert "max_discharge_power" not in limits

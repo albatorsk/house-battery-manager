@@ -60,6 +60,45 @@ unchanged meter is treated as unavailable (60 s, 0 disables).
 
 Everything can be changed later under **Configure**.
 
+## Using with APstorage
+
+This integration works with the
+[APstorage Modbus integration](https://github.com/albatorsk/apstorage-ha)
+(ELT-12, and probably ELS-11.4).
+
+1. Install and set up the APstorage integration first.
+2. Add House Battery Manager. If exactly one APstorage battery is set up, the
+   setup form is pre-filled with its entities:
+
+   | Field | APstorage entity |
+   |---|---|
+   | Battery setpoint | `number.aps_<serial>_set_power` |
+   | Battery actual power | `sensor.aps_<serial>_battery_power` |
+   | Battery SoC | `sensor.aps_<serial>_state_of_charge_soc` |
+   | Max charge/discharge power | The *Max Charge Rate* and *Max Discharge Rate* values the battery reports |
+
+3. Leave *Battery power sensor is positive when charging* off. APstorage uses
+   the same convention as this integration: positive W = discharge.
+4. Add your own energy meter and, preferably, per-phase sensors.
+
+Things to know:
+
+* APstorage polls the battery every 60 s by default, so its battery power and
+  SoC can be up to a minute old. A battery power reading taken before the last
+  command is ignored, and the setpoint just sent is used instead. Polling more
+  often adds load to the same Modbus server that receives the commands.
+* Do not use APstorage's *Grid Power Phase A/B/C* as the meter or the phase
+  sensors. They are polled far too slowly for fuse protection. Use the house
+  meter.
+* APstorage sends a setpoint 0.4 s after it is set and pauses polling for
+  1.5 s after a write. Both fit within the 3 s command interval.
+* APstorage only logs failed writes. The service call still succeeds, so this
+  integration cannot tell. Check the APstorage log if the battery does not
+  follow `sensor.<name>_battery_setpoint`.
+* With Modbus enabled, the battery waits in standby (HOLDING) until it gets a
+  command. In `Off` mode this integration sends nothing, so the battery keeps
+  the last setpoint it got. Use `Idle` to make the battery stop.
+
 ## Entities created
 
 | Entity | Purpose |

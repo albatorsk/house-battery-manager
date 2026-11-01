@@ -102,6 +102,9 @@ class BatteryManager:
         self.last_setpoint: float = 0.0
         self.last_written: float | None = None
         self.last_write_time: float = float("-inf")
+        # Wall-clock time of the last successful write, to spot battery power
+        # readings taken before it (slowly polled integrations).
+        self.last_write_at: datetime | None = None
         # The battery's Modbus server is easily overloaded: never send commands
         # more often than this.
         self._command_interval = float(
@@ -298,8 +301,11 @@ class BatteryManager:
         entity_id = self.config[CONF_BATTERY_SETPOINT]
         state = self.hass.states.get(entity_id)
         if state is not None:
-            # Respect the min/max of the target number entity.
+            # Respect the step and min/max of the target number entity.
             try:
+                step = float(state.attributes.get("step") or 0)
+                if step > 0:
+                    value = round(value / step) * step
                 value = max(value, float(state.attributes["min"]))
                 value = min(value, float(state.attributes["max"]))
             except (KeyError, TypeError, ValueError):
@@ -346,6 +352,7 @@ class BatteryManager:
             _LOGGER.warning("Failed to write %s W to %s: %s", value, entity_id, err)
             return
         self.last_written = value
+        self.last_write_at = dt_util.utcnow()
         # Only what was actually sent counts as the battery's commanded power.
         self.last_setpoint = value
 
@@ -365,6 +372,13 @@ class BatteryManager:
                 _LOGGER.debug("%s is stale (last reported %s)", entity_id, reported)
                 return None
         return state
+
+    def _reported_before_last_write(self, entity_id: str) -> bool:
+        if self.last_write_at is None:
+            return False
+        state = self.hass.states.get(entity_id)
+        reported = getattr(state, "last_reported", None) or state.last_updated
+        return reported <= self.last_write_at
 
     def _read_number(self, entity_id: str | None, check_stale: bool = False) -> float | None:
         state = self._state(entity_id, check_stale)
@@ -404,6 +418,12 @@ class BatteryManager:
         voltage = self.settings.voltage
 
         battery_power = self._read_power(cfg.get(CONF_BATTERY_POWER))
+        if battery_power is not None and self._reported_before_last_write(
+            cfg[CONF_BATTERY_POWER]
+        ):
+            # Measured before the last command (for example APstorage polls
+            # every 60 s by default): the setpoint just sent is a better guess.
+            battery_power = None
         if battery_power is not None and cfg.get(CONF_BATTERY_POWER_INVERT):
             battery_power = -battery_power
         battery_now = battery_power if battery_power is not None else self.last_setpoint
