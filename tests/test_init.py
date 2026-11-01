@@ -148,6 +148,18 @@ async def test_commands_at_least_3_seconds_apart(hass: HomeAssistant, clock) -> 
     assert min(gaps) >= 3
 
 
+async def test_custom_command_interval(hass: HomeAssistant, clock) -> None:
+    await _setup(hass, min_command_interval=5)
+    assert _setpoint(hass) == 1200
+
+    hass.states.async_set(METER, "2200", {"unit_of_measurement": "W"})
+    await _advance(hass, clock, 3)
+    # The default 3 s has passed, but this entry is set to 5 s.
+    assert _setpoint(hass) == 1200
+    await _advance(hass, clock, 2)
+    assert _setpoint(hass) == 3400
+
+
 async def test_overload_sensor_and_discharge(hass: HomeAssistant, clock) -> None:
     _set_phases(hass, 5, 5, 5)
     await _setup(hass, **PHASES)

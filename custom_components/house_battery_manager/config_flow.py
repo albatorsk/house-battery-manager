@@ -119,7 +119,7 @@ TUNING_SCHEMA = vol.Schema(
         vol.Required(CONF_GAIN, default=DEFAULT_GAIN): _num(0.1, 1.0, 0.05),
         vol.Required(CONF_DEADBAND, default=DEFAULT_DEADBAND): _num(0, 1000, 5, "W"),
         vol.Required(CONF_MIN_WRITE_CHANGE, default=DEFAULT_MIN_WRITE_CHANGE): _num(0, 1000, 5, "W"),
-        vol.Required(CONF_COMMAND_INTERVAL, default=DEFAULT_COMMAND_INTERVAL): _num(3, 60, 1, "s"),
+        vol.Required(CONF_COMMAND_INTERVAL, default=DEFAULT_COMMAND_INTERVAL): _num(1, 60, 0.5, "s"),
         vol.Required(CONF_STALE_TIMEOUT, default=DEFAULT_STALE_TIMEOUT): _num(0, 3600, 5, "s"),
     }
 )

@@ -316,7 +316,9 @@ class BatteryManager:
         ):
             return
 
-        spacing = EMERGENCY_COMMAND_SPACING if urgent else self._command_interval
+        spacing = self._command_interval
+        if urgent:
+            spacing = min(spacing, EMERGENCY_COMMAND_SPACING)
         wait = spacing - (now - self.last_write_time)
         if wait > 0:
             if not force:

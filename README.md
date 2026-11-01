@@ -55,7 +55,7 @@ every phase below the main fuse rating.
 
 **Tuning** — control interval (5 s), gain (0.7), deadband (30 W), minimum
 setpoint change before writing over Modbus (20 W), minimum time between
-battery commands (3 s, cannot be set lower) and the time after which an
+battery commands (3 s by default, adjustable from 1 s to 60 s) and the time after which an
 unchanged meter is treated as unavailable (60 s, 0 disables).
 
 Everything can be changed later under **Configure**.
@@ -125,7 +125,7 @@ Every control interval, and shortly after every meter update:
    applies to forced charging, so grid charging always stays within the fuse.
 
 **Command rate limit:** the battery's Modbus server is never sent a command
-more often than every 3 seconds (configurable, minimum 3 s). The controller
+more often than every 3 seconds by default (adjustable from 1 s to 60 s). The controller
 still reacts to every meter update. If a change is needed sooner, it waits
 until 3 s have passed, recalculates with the latest measurements, and sends
 that value, so it never sends an outdated one. Failed writes count too, so a
