@@ -1,0 +1,237 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "House Battery Manager",
+        "data": {
+          "name": "Name"
+        }
+      },
+      "entities": {
+        "title": "Entities",
+        "description": "Battery setpoint convention: positive W = discharge/export, negative W = charge/import.",
+        "data": {
+          "battery_setpoint_entity": "Battery setpoint (number entity, W)",
+          "battery_power_entity": "Battery actual power (optional, W)",
+          "battery_power_invert": "Battery power sensor is positive when charging",
+          "soc_entity": "Battery state of charge (optional, %)",
+          "meter_entity": "Energy meter power (W)",
+          "meter_type": "What the meter measures",
+          "meter_invert": "Meter is positive when exporting (grid meter only)",
+          "pv_entity": "PV power (optional, W)",
+          "ev_entity": "EV charger power (optional, W)",
+          "ev_included_in_meter": "EV charger is included in the meter reading"
+        },
+        "data_description": {
+          "battery_power_entity": "Strongly recommended. Without it the last written setpoint is assumed to be the actual battery power.",
+          "meter_type": "Grid: net power at the house connection (preferred). Consumption: house load only, grid is then calculated as load - PV - battery.",
+          "pv_entity": "Required when the meter measures consumption."
+        }
+      },
+      "limits": {
+        "title": "Fuses and power limits",
+        "description": "Per-phase sensors are strongly recommended. Without them the load is assumed to be evenly split across the three phases, which may not protect a single overloaded phase.",
+        "data": {
+          "phase_l1_entity": "Phase L1 sensor",
+          "phase_l2_entity": "Phase L2 sensor",
+          "phase_l3_entity": "Phase L3 sensor",
+          "phase_unit": "Phase sensors measure",
+          "voltage": "Phase voltage",
+          "fuse_current": "Main fuse rating per phase",
+          "fuse_margin": "Safety margin below the fuse rating",
+          "max_charge_power": "Maximum battery charge power",
+          "max_discharge_power": "Maximum battery discharge power"
+        }
+      },
+      "tuning": {
+        "title": "Regulation tuning",
+        "data": {
+          "update_interval": "Control interval",
+          "gain": "Regulation gain",
+          "deadband": "Deadband around the grid target",
+          "min_write_change": "Minimum setpoint change before writing",
+          "stale_timeout": "Treat meter as unavailable after (0 = never)",
+          "min_command_interval": "Minimum time between battery commands"
+        },
+        "data_description": {
+          "gain": "Fraction of the grid error corrected per step. Lower is calmer, higher reacts faster but may oscillate.",
+          "min_command_interval": "Protects the battery's Modbus server. Changes needed sooner are sent as soon as this time has passed, based on fresh measurements."
+        }
+      }
+    },
+    "error": {
+      "phases_incomplete": "Select either all three phase sensors or none."
+    }
+  },
+  "options": {
+    "step": {
+      "entities": {
+        "title": "Entities",
+        "description": "Battery setpoint convention: positive W = discharge/export, negative W = charge/import.",
+        "data": {
+          "battery_setpoint_entity": "Battery setpoint (number entity, W)",
+          "battery_power_entity": "Battery actual power (optional, W)",
+          "battery_power_invert": "Battery power sensor is positive when charging",
+          "soc_entity": "Battery state of charge (optional, %)",
+          "meter_entity": "Energy meter power (W)",
+          "meter_type": "What the meter measures",
+          "meter_invert": "Meter is positive when exporting (grid meter only)",
+          "pv_entity": "PV power (optional, W)",
+          "ev_entity": "EV charger power (optional, W)",
+          "ev_included_in_meter": "EV charger is included in the meter reading"
+        }
+      },
+      "limits": {
+        "title": "Fuses and power limits",
+        "data": {
+          "phase_l1_entity": "Phase L1 sensor",
+          "phase_l2_entity": "Phase L2 sensor",
+          "phase_l3_entity": "Phase L3 sensor",
+          "phase_unit": "Phase sensors measure",
+          "voltage": "Phase voltage",
+          "fuse_current": "Main fuse rating per phase",
+          "fuse_margin": "Safety margin below the fuse rating",
+          "max_charge_power": "Maximum battery charge power",
+          "max_discharge_power": "Maximum battery discharge power"
+        }
+      },
+      "tuning": {
+        "title": "Regulation tuning",
+        "data": {
+          "update_interval": "Control interval",
+          "gain": "Regulation gain",
+          "deadband": "Deadband around the grid target",
+          "min_write_change": "Minimum setpoint change before writing",
+          "stale_timeout": "Treat meter as unavailable after (0 = never)",
+          "min_command_interval": "Minimum time between battery commands"
+        },
+        "data_description": {
+          "min_command_interval": "Protects the battery's Modbus server. Changes needed sooner are sent as soon as this time has passed, based on fresh measurements."
+        }
+      }
+    },
+    "error": {
+      "phases_incomplete": "Select either all three phase sensors or none."
+    }
+  },
+  "selector": {
+    "meter_type": {
+      "options": {
+        "grid": "Grid connection (net import/export)",
+        "consumption": "House consumption only"
+      }
+    },
+    "phase_unit": {
+      "options": {
+        "current": "Current (A)",
+        "power": "Power (W)"
+      }
+    }
+  },
+  "entity": {
+    "select": {
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "auto": "Auto (zero grid)",
+          "force_charge": "Force charge",
+          "force_discharge": "Force discharge",
+          "idle": "Idle",
+          "off": "Off (no control)"
+        }
+      }
+    },
+    "number": {
+      "grid_target": {
+        "name": "Grid target"
+      },
+      "force_charge_power": {
+        "name": "Force charge power"
+      },
+      "force_discharge_power": {
+        "name": "Force discharge power"
+      },
+      "force_duration": {
+        "name": "Force duration"
+      },
+      "min_soc": {
+        "name": "Reserve SoC"
+      },
+      "charge_target_soc": {
+        "name": "Force charge target SoC"
+      },
+      "discharge_target_soc": {
+        "name": "Force discharge target SoC"
+      }
+    },
+    "switch": {
+      "battery_powers_ev": {
+        "name": "Battery may power EV"
+      }
+    },
+    "sensor": {
+      "status": {
+        "name": "Status"
+      },
+      "battery_setpoint": {
+        "name": "Battery setpoint"
+      },
+      "grid_power": {
+        "name": "Grid power"
+      },
+      "fuse_headroom": {
+        "name": "Fuse headroom"
+      },
+      "force_end": {
+        "name": "Force ends"
+      }
+    },
+    "binary_sensor": {
+      "fuse_overload": {
+        "name": "Fuse overload"
+      }
+    }
+  },
+  "services": {
+    "force_charge": {
+      "name": "Force charge",
+      "description": "Charge the battery at a fixed power, within the fuse limit.",
+      "fields": {
+        "power": {
+          "name": "Power",
+          "description": "Charge power in W. Defaults to the Force charge power entity."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Minutes until returning to the previous mode. 0 = until cancelled or target SoC reached."
+        },
+        "target_soc": {
+          "name": "Target SoC",
+          "description": "Stop when this SoC is reached."
+        }
+      }
+    },
+    "force_discharge": {
+      "name": "Force discharge",
+      "description": "Discharge the battery at a fixed power, within the fuse limit.",
+      "fields": {
+        "power": {
+          "name": "Power",
+          "description": "Discharge power in W. Defaults to the Force discharge power entity."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Minutes until returning to the previous mode. 0 = until cancelled or target SoC reached."
+        },
+        "target_soc": {
+          "name": "Target SoC",
+          "description": "Stop when this SoC is reached."
+        }
+      }
+    },
+    "cancel_force": {
+      "name": "Cancel force",
+      "description": "End a forced charge/discharge and return to the previous mode."
+    }
+  }
+}

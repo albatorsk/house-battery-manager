@@ -1,0 +1,59 @@
+force_charge:
+  target:
+    entity:
+      integration: house_battery_manager
+      domain: select
+  fields:
+    power:
+      selector:
+        number:
+          min: 0
+          max: 20000
+          step: 50
+          unit_of_measurement: W
+    duration:
+      selector:
+        number:
+          min: 0
+          max: 1440
+          step: 5
+          unit_of_measurement: min
+    target_soc:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+
+force_discharge:
+  target:
+    entity:
+      integration: house_battery_manager
+      domain: select
+  fields:
+    power:
+      selector:
+        number:
+          min: 0
+          max: 20000
+          step: 50
+          unit_of_measurement: W
+    duration:
+      selector:
+        number:
+          min: 0
+          max: 1440
+          step: 5
+          unit_of_measurement: min
+    target_soc:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+
+cancel_force:
+  target:
+    entity:
+      integration: house_battery_manager
+      domain: select

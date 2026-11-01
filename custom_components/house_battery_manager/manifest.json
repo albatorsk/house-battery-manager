@@ -1,0 +1,15 @@
+{
+  "domain": "house_battery_manager",
+  "name": "House Battery Manager",
+  "codeowners": [
+    "@albatorsk"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/albatorsk/House-battery-manager",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/albatorsk/House-battery-manager/issues",
+  "requirements": [],
+  "version": "0.0.1"
+}
