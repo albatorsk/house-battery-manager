@@ -6,10 +6,10 @@
   ],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/albatorsk/House-battery-manager",
+  "documentation": "https://github.com/albatorsk/house-battery-manager",
   "integration_type": "service",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/albatorsk/House-battery-manager/issues",
+  "issue_tracker": "https://github.com/albatorsk/house-battery-manager/issues",
   "requirements": [],
   "version": "0.0.1"
 }

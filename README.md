@@ -8,7 +8,7 @@ every phase below the main fuse rating.
 ## Installation
 
 **HACS:** HACS → ⋮ → *Custom repositories* → add
-`https://github.com/albatorsk/House-battery-manager` as an *Integration*, then
+`https://github.com/albatorsk/house-battery-manager` as an *Integration*, then
 install *House Battery Manager*.
 
 **Manual:** copy `custom_components/house_battery_manager` into your Home
